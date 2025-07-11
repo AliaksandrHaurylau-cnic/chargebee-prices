@@ -1,0 +1,27 @@
+{
+  "name": "chargebee-prices",
+  "version": "1.0.0",
+  "description": "Script to fetch all prices, coupons, and charges for all plans in a ChargeBee product family",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "chargebee",
+    "prices",
+    "coupons",
+    "charges",
+    "product-catalog-2.0"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^24.0.13",
+    "chargebee-typescript": "^2.49.0",
+    "dotenv": "^17.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
