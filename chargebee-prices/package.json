@@ -1,0 +1,20 @@
+{
+  "name": "chargebee-prices",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "prepare-zip": "npm run build && npm install --production && zip -r lambda.zip dist node_modules package.json .env",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "chargebee-typescript": "^2.49.0",
+    "dotenv": "^17.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
