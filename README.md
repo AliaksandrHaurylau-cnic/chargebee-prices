@@ -17,6 +17,10 @@ This script fetches all prices, charges, and applicable coupons for all plans wi
    ```
    npm install
    ```
+3. Run tests (optional):
+   ```
+   npm test
+   ```
 3. Configure your ChargeBee credentials by editing `src/config.json`:
    ```json
    {
@@ -27,6 +31,13 @@ This script fetches all prices, charges, and applicable coupons for all plans wi
 4. Certificate configuration:
    - The script is configured to use a certificate at `/usr/local/share/ca-certificates/CertEmulationCA.crt`
    - If you need to use a different certificate or path, update the `certPath` variable in the source files
+   - If you encounter TLS certificate issues (e.g., "unable to get local issuer certificate"), you can temporarily disable certificate validation for testing:
+     ```bash
+     # Only use this in development/testing environments!
+     export NODE_TLS_REJECT_UNAUTHORIZED=0
+     npm start
+     ```
+     ⚠️ **Warning**: This is not recommended for production use as it bypasses SSL/TLS certificate validation.
 
 ## Usage
 
@@ -43,6 +54,22 @@ Or using ts-node directly:
 ```bash
 npx ts-node src/index.ts YOUR_PRODUCT_FAMILY_ID
 ```
+
+### Domain TLD-Specific Prices
+
+To fetch simplified pricing information for a specific domain TLD:
+
+```bash
+npm run start YOUR_PRODUCT_FAMILY_ID domain DOMAIN_TLD
+```
+
+For example:
+
+```bash
+npm run start DoMain-Domains domain com
+```
+
+This will return a simplified JSON array with price IDs, amounts, and currencies for the specified domain TLD.
 
 ### Item-Specific Script - Get Prices for a Specific Item
 

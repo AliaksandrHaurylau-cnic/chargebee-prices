@@ -21,7 +21,12 @@ const DEBUG = process.env.DEBUG === 'true' || process.env.DEBUG === '1';
 function debug(message: string, data?: any): void {
   if (DEBUG) {
     if (data) {
-      console.log(`[DEBUG] ${message}`, data);
+      if (typeof data === 'object') {
+        console.log(`[DEBUG] ${message}`);
+        console.dir(data, { depth: null, colors: true });
+      } else {
+        console.log(`[DEBUG] ${message}`, data);
+      }
     } else {
       console.log(`[DEBUG] ${message}`);
     }
@@ -100,6 +105,7 @@ interface PlanPriceDetails {
     applyOn: string;
     itemConstraints: any;
   }>;
+  metadata?: any; // New metadata field
 }
 
 /**
@@ -125,8 +131,8 @@ async function getAllPricesForProductFamily(itemFamilyId: string): Promise<PlanP
     
     do {
       const itemListParams: any = {
-        limit: 100, // Maximum allowed by API
-        item_family_id: { is: itemFamilyId }
+        limit: 100 // Maximum allowed by API
+        , item_family_id: { is: itemFamilyId }
       };
       
       if (offset) {
@@ -134,12 +140,15 @@ async function getAllPricesForProductFamily(itemFamilyId: string): Promise<PlanP
         debug('Using pagination offset', { offset });
       }
       
-      debug('Fetching items with params', itemListParams);
+      debug('Fetching items with params', JSON.stringify(itemListParams, null, 2));
       const itemListResponse = await chargebee.item.list(itemListParams).request();
+      
       debug('Item list response received', { 
         count: itemListResponse.list.length,
         hasNextPage: !!itemListResponse.next_offset
       });
+      debug('Full item list response', JSON.stringify(itemListResponse, null, 2));
+      debug('Raw item list array', itemListResponse.list);
       
       allItems = [...allItems, ...itemListResponse.list.map((item: any) => item.item)];
       offset = itemListResponse.next_offset;
@@ -158,7 +167,8 @@ async function getAllPricesForProductFamily(itemFamilyId: string): Promise<PlanP
         itemName: item.name,
         itemType: item.type,
         itemFamily: itemFamilyId,
-        prices: []
+        prices: [],
+        metadata: item.metadata // Add metadata field from item response
       };
       
       // Step 3.1: Fetch item prices
@@ -355,6 +365,70 @@ async function getAllPricesForProductFamily(itemFamilyId: string): Promise<PlanP
 }
 
 /**
+ * Simplified interface for domain price information
+ */
+interface DomainPriceInfo {
+  id: string;
+  price: number;
+  currency: string;
+}
+
+/**
+ * Gets simplified price information for a specific domain TLD
+ * @param itemFamilyId - The ID of the product family (e.g. "DoMain-Domains")
+ * @param domainName - The TLD to filter by (e.g. "com", "info")
+ * @returns Promise<DomainPriceInfo[]> - Array of simplified price information
+ */
+async function getDomainPrices(itemFamilyId: string, domainName: string): Promise<DomainPriceInfo[]> {
+  try {
+    debug('Starting getDomainPrices', { itemFamilyId, domainName });
+    
+    // Get all prices from the product family
+    const allPrices = await getAllPricesForProductFamily(itemFamilyId);
+    debug('Retrieved all prices', { count: allPrices.length });
+    
+    // Filter items by the domain TLD in metadata
+    const filteredItems = allPrices.filter(item => {
+      // Check if metadata exists and contains the specified TLD
+      if (item.metadata && item.metadata.tld === domainName) {
+        return true;
+      }
+      
+      // Fallback to checking item ID/name if metadata is not available
+      return (
+        item.itemId.startsWith(`${domainName}-`) ||
+        item.itemId.startsWith(`${domainName}domain-`) ||
+        item.itemId.includes(`-${domainName}-`)
+      );
+    });
+    
+    debug('Filtered items by domain TLD', { count: filteredItems.length, domainName });
+    
+    // Extract simplified price information from filtered items
+    const simplifiedPrices: DomainPriceInfo[] = [];
+    
+    filteredItems.forEach(item => {
+      if (item.prices && item.prices.length > 0) {
+        item.prices.forEach(price => {
+          simplifiedPrices.push({
+            id: price.id,
+            price: price.price,
+            currency: price.currencyCode
+          });
+        });
+      }
+    });
+    
+    debug('Generated simplified price information', { count: simplifiedPrices.length });
+    return simplifiedPrices;
+  } catch (error) {
+    console.error(`Error fetching domain prices for ${domainName}:`, error);
+    debug('Error in getDomainPrices', { error, domainName });
+    throw error;
+  }
+}
+
+/**
  * Main function to execute the script
  */
 async function main() {
@@ -362,7 +436,15 @@ async function main() {
   try {
     // Check if product family ID is provided as a command-line argument
     const itemFamilyId = process.argv[2];
-    debug('Command line arguments', { argv: process.argv, itemFamilyId });
+    const operation = process.argv[3]; // Can be "domain" to use the new function
+    const domainName = process.argv[4]; // Domain TLD if operation is "domain"
+    
+    debug('Command line arguments', { 
+      argv: process.argv, 
+      itemFamilyId, 
+      operation, 
+      domainName 
+    });
     
     if (!itemFamilyId) {
       console.error("Please provide a product family ID as a command-line argument");
@@ -370,16 +452,26 @@ async function main() {
       process.exit(1);
     }
     
-    // Fetch all prices
-    debug('Calling getAllPricesForProductFamily');
-    const allPrices = await getAllPricesForProductFamily(itemFamilyId);
-    debug('Retrieved all prices', { count: allPrices.length });
+    let result;
+    
+    // Check if we're using the simplified domain prices function
+    if (operation === "domain" && domainName) {
+      debug('Using getDomainPrices function');
+      console.log(`Fetching prices for domain TLD: ${domainName}`);
+      result = await getDomainPrices(itemFamilyId, domainName);
+      console.log(`\nSuccessfully fetched ${result.length} prices for .${domainName} domain`);
+    } else {
+      // Default behavior: fetch all prices
+      debug('Calling getAllPricesForProductFamily');
+      result = await getAllPricesForProductFamily(itemFamilyId);
+      debug('Retrieved all prices', { count: result.length });
+      console.log(`\nSuccessfully fetched data for ${result.length} items with their prices, charges, and applicable coupons.`);
+    }
     
     // Output results
     debug('Outputting JSON results');
-    console.log(JSON.stringify(allPrices, null, 2));
+    console.log(JSON.stringify(result, null, 2));
     
-    console.log(`\nSuccessfully fetched data for ${allPrices.length} items with their prices, charges, and applicable coupons.`);
     debug('Script completed successfully');
   } catch (error) {
     console.error("Script execution failed:", error);
@@ -388,5 +480,10 @@ async function main() {
   }
 }
 
-// Run the script
-main();
+// Export functions for testing
+export { getAllPricesForProductFamily, getDomainPrices };
+
+// Only run the script when this file is executed directly (not when imported in tests)
+if (require.main === module) {
+  main();
+}
