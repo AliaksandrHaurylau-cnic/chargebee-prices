@@ -25,3 +25,32 @@ Thumbs.db
 
 # Config with credentials
 /src/config.json
+
+# Ignore environment files
+.env
+
+# Ignore backup and archive files
+*.zip
+
+# Ignore node modules
+node_modules/
+
+# Ignore build output
+/dist
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore HTTP request files
+requests.http
+
+# Ignore logs
+*.log
+
+# Documentation files
+doc/*.json
+doc/*.md
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
